@@ -13,19 +13,21 @@ const MOCK_VALID_AFTER = "0x0000000000001234";
 
 const signUserOp = async (UserOp: UserOperation): Promise<UserOperation> => {
   const provider = new ethers.providers.JsonRpcProvider(
-    "http://127.0.0.1:8545/"
+    process.env.PROVIDER as string
   );
-  const ethersSigner = provider.getSigner();
+  // const ethersSigner = provider.getSigner();
+  const ethersSigner = new ethers.Wallet(
+    process.env.PVT_KEY as string,
+    provider
+  );
   const entryPoint = EntryPoint__factory.connect(
-    "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+    process.env.ENTRY_POINT as string,
     ethersSigner
   );
   console.log(`entrypoint address: ${entryPoint.address}`);
-  const offchainSigner = new ethers.Wallet(
-    "a279717e8b02d2e054174b8b2c4732008865f01720eda8c8c423b3c6f5cbe9cd"
-  );
+  const offchainSigner = new ethers.Wallet(process.env.PVT_KEY as string);
   const paymaster = VerifyingPaymaster__factory.connect(
-    "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+    process.env.PAYMASTER as string,
     ethersSigner
   );
   const userOp1 = await fillAndSign(
@@ -40,18 +42,11 @@ const signUserOp = async (UserOp: UserOperation): Promise<UserOperation> => {
       preVerificationGas: UserOp.preVerificationGas,
       verificationGasLimit: UserOp.verificationGasLimit,
       signature: UserOp.signature,
-      paymasterAndData: hexConcat([
-        paymaster.address,
-        defaultAbiCoder.encode(
-          ["uint48", "uint48"],
-          [MOCK_VALID_UNTIL, MOCK_VALID_AFTER]
-        ),
-        "0x" + "00".repeat(65),
-      ]),
     },
     offchainSigner,
     entryPoint
   );
+  console.log(`paymaster: ${paymaster.address}`);
   const hash = await paymaster.getHash(
     userOp1,
     MOCK_VALID_UNTIL,
@@ -80,8 +75,6 @@ const signUserOp = async (UserOp: UserOperation): Promise<UserOperation> => {
 export const getPaymasterAndData = async (req: any, res: any) => {
   const UserOp: string = req.body;
   const parsedUserOp: UserOperation = JSON.parse(JSON.stringify(UserOp));
-  console.log(`gotUserOp: ${JSON.stringify(parsedUserOp)}`);
   const result = await signUserOp(parsedUserOp);
-  console.log(`result: ${JSON.stringify(result)}`);
   res.status(200).json({ result: result });
 };
